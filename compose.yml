@@ -1,0 +1,88 @@
+# Base stack, shared by the Mac (dev) and the Raspberry Pi.
+# - Mac dev:  docker compose watch            (adds compose.override.yml: simulated sensor)
+# - Pi:       docker compose -f compose.yml -f compose.pi.yml up -d --no-build
+#             (run by scripts/deploy-pi.sh; adds GPIO access, uses the prebuilt image)
+
+x-app: &app
+  image: weather-station:${TAG:-latest}
+  platform: linux/arm64
+  build:
+    context: .
+    dockerfile: backend/Dockerfile
+  environment: &app-env
+    PROJECT_NAME: ${PROJECT_NAME:-Weather Station}
+    DATABASE_URL: postgresql://postgres:${POSTGRES_PASSWORD:?Variable not set}@db:5432/app
+  env_file:
+    - path: .env
+      required: false
+
+services:
+
+  db:
+    image: postgres:18
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d app"]
+      interval: 10s
+      retries: 5
+      start_period: 30s
+      timeout: 10s
+    volumes:
+      - app-db-data:/var/lib/postgresql
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?Variable not set}
+      - POSTGRES_DB=app
+
+  # One-shot: apply Alembic migrations, then exit.
+  prestart:
+    <<: *app
+    command: bash scripts/prestart.sh
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+
+  # API + built React dashboard.
+  backend:
+    <<: *app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+      prestart:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/utils/health-check/"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Reads the sensors and writes readings. The only service that touches GPIO.
+  collector:
+    <<: *app
+    restart: unless-stopped
+    command: python -m app.collector
+    depends_on:
+      db:
+        condition: service_healthy
+        restart: true
+      prestart:
+        condition: service_completed_successfully
+    stop_grace_period: 5s
+
+  # DB browser for debugging: http://<host>:8080 (server: db, user: postgres)
+  adminer:
+    image: adminer
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "8080:8080"
+    environment:
+      - ADMINER_DESIGN=pepa-linha-dark
+
+volumes:
+  app-db-data:

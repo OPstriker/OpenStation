@@ -1,0 +1,33 @@
+# Raspberry Pi 5 overrides. Used by scripts/deploy-pi.sh:
+#   docker compose -f compose.yml -f compose.pi.yml up -d --no-build
+# The image is built on the Mac and loaded with `docker load`; never built or pulled here.
+x-prebuilt: &prebuilt
+  pull_policy: never
+
+services:
+
+  prestart:
+    <<: *prebuilt
+
+  backend:
+    <<: *prebuilt
+
+  collector:
+    <<: *prebuilt
+    # GPIO access without --privileged: only the RP1 GPIO chip is passed in.
+    # The container runs as root, so no group mapping is needed.
+    # Pi OS kernels >= 6.6.45 expose the 40-pin header as /dev/gpiochip0; older
+    # kernels use /dev/gpiochip4. Check on the Pi with `gpioinfo` or
+    # `ls -l /dev/gpiochip*`, then set GPIO_CHIP in .env.pi if it isn't 0.
+    # The barometer's I2C bus (SDA GPIO2 / SCL GPIO3) is /dev/i2c-1; it only
+    # exists once I2C is enabled (sudo raspi-config nonint do_i2c 0, reboot).
+    # Every device listed here must exist or the container won't start.
+    devices:
+      - /dev/gpiochip${GPIO_CHIP:-0}:/dev/gpiochip${GPIO_CHIP:-0}
+      - /dev/i2c-${BAROMETER_I2C_BUS:-1}:/dev/i2c-${BAROMETER_I2C_BUS:-1}
+    environment:
+      GPIOZERO_PIN_FACTORY: lgpio
+      # Open the same chip that was passed in (otherwise gpiozero guesses
+      # from the board revision and the /dev entries it can see).
+      GPIO_CHIP: ${GPIO_CHIP:-0}
+      COLLECTOR_SIMULATE: "false"

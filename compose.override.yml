@@ -1,0 +1,43 @@
+# Mac development overrides (auto-loaded by `docker compose` / `docker compose watch`).
+# No GPIO here: the collector simulates the anemometer with gpiozero's MockFactory.
+services:
+
+  db:
+    ports:
+      - "5432:5432"
+
+  backend:
+    command:
+      - fastapi
+      - dev
+      - --host
+      - "0.0.0.0"
+    develop:
+      watch:
+        - path: ./backend
+          action: sync
+          target: /app/backend
+          ignore:
+            - .venv
+        - path: ./backend/pyproject.toml
+          action: rebuild
+        - path: ./frontend
+          action: rebuild
+          ignore:
+            - ./frontend/node_modules
+            - ./frontend/dist
+            - ./frontend/blob-report
+            - ./frontend/test-results
+    environment:
+      FASTAPI_ENV: "development"
+
+  collector:
+    environment:
+      COLLECTOR_SIMULATE: "true"
+      SIM_WIND_MPH: ${SIM_WIND_MPH:-8}
+      COLLECTOR_LOG_EVERY_S: "5"
+    develop:
+      watch:
+        - path: ./backend/app
+          action: sync+restart
+          target: /app/backend/app

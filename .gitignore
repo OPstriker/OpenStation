@@ -1,0 +1,16 @@
+.vscode/*
+!.vscode/extensions.json
+node_modules/
+backend/app/frontend/
+/test-results/
+/playwright-report/
+/blob-report/
+/playwright/.cache/
+
+# Pi deployment secrets (copied to the Pi as .env by scripts/deploy-pi.sh)
+.env.pi
+
+# Image + files built for manual copy to the Pi
+pi-bundle/
+
+/build
