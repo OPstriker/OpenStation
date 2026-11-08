@@ -24,6 +24,7 @@ from app.collector.simulate import (
     VaneSimulator,
     WindSimulator,
 )
+from app.collector.uploader import WundergroundUploader
 from app.collector.wind_vane import KY040WindVane
 from app.core.config import Settings, settings
 from app.core.db import engine
@@ -219,6 +220,8 @@ def run(cfg: Settings = settings) -> None:
         return
     for sim in sims:
         sim.start()
+    uploader = WundergroundUploader(dry_run=cfg.COLLECTOR_SIMULATE)
+    uploader.start()
 
     interval = cfg.SAMPLE_INTERVAL_S
     last = time.monotonic()
@@ -262,6 +265,7 @@ def run(cfg: Settings = settings) -> None:
                 last_log = now
                 logger.info(" | ".join(summaries))
     finally:
+        uploader.stop()
         for sim in sims:
             sim.stop()
         for sensor in sensors:

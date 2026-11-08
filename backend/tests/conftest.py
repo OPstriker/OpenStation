@@ -6,7 +6,8 @@ from sqlmodel import Session, delete
 
 from app.core.db import engine
 from app.main import app
-from app.models import SensorReading
+from app.models import SensorReading, WundergroundConfig
+from app.wunderground import get_config
 
 # Tests write under this sensor name and clean it up, so a real collector
 # running against the same database is left alone.
@@ -27,3 +28,17 @@ def db() -> Generator[Session]:
 def client() -> Generator[TestClient]:
     with TestClient(app) as c:
         yield c
+
+
+@pytest.fixture
+def wu_config(db: Session) -> Generator[WundergroundConfig]:
+    """Row 1 of wunderground_config, restored after the test."""
+    cfg = get_config(db)
+    saved = cfg.model_dump()
+    yield cfg
+    db.rollback()
+    cfg = get_config(db)
+    for name, value in saved.items():
+        setattr(cfg, name, value)
+    db.add(cfg)
+    db.commit()

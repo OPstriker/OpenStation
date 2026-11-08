@@ -9,6 +9,7 @@ backend/app/frontend/
 
 # Pi deployment secrets (copied to the Pi as .env by scripts/deploy-pi.sh)
 .env.pi
+.env
 
 # Image + files built for manual copy to the Pi
 pi-bundle/

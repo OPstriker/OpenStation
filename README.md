@@ -63,6 +63,20 @@ Air quality (Grove SCD41, I2C address 0x62): wire it to the same four pins as th
 
 Enable I2C on the Pi once with `sudo raspi-config nonint do_i2c 0` and reboot. `i2cdetect -y 1` should then show `62` and `77`. The collector container won't start without `/dev/i2c-1`.
 
+## Weather Underground
+
+The station can upload to your Weather Underground personal weather station. Open the **Weather Underground** page in the dashboard and enter:
+- the **station ID** and **station key** (wunderground.com → My Profile → My Devices);
+- how often to upload (5 minutes by default);
+- the station elevation in feet, which is needed to send sea-level pressure.
+
+Then tick **Upload enabled**. Each upload sends:
+- temperature, humidity and dew point from the SCD41;
+- sea-level pressure from the barometer;
+- the 2-minute average wind speed, the 10-minute gust and the 2-minute average direction.
+
+A field is left out while its sensor has no fresh reading, and wind direction is left out until north is set. No precipitation is sent. In simulate mode (the Mac) uploads are dry runs and nothing is sent.
+
 ## Quick start
 
 ### Mac (development, simulated sensors)

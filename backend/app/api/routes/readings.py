@@ -3,10 +3,9 @@ from datetime import timedelta
 
 from fastapi import APIRouter, Query
 from sqlalchemy import text
-from sqlmodel import col, func, select
+from sqlmodel import col, select
 
 from app.api.deps import SessionDep
-from app.core.config import settings
 from app.models import (
     LatestReadings,
     ReadingHistory,
@@ -14,6 +13,7 @@ from app.models import (
     SensorReading,
     get_datetime_utc,
 )
+from app.readings import latest_readings
 
 router = APIRouter(prefix="/readings", tags=["readings"])
 
@@ -28,27 +28,7 @@ def read_latest(
     session: SessionDep, sensor: str = Query(default="anemometer", max_length=64)
 ) -> LatestReadings:
     """Newest value of every metric for a sensor, plus a staleness flag."""
-    latest_ts = session.exec(
-        select(func.max(SensorReading.ts)).where(SensorReading.sensor == sensor)
-    ).one()
-    if latest_ts is None:
-        return LatestReadings(
-            sensor=sensor, ts=None, age_s=None, stale=True, metrics={}
-        )
-
-    rows = session.exec(
-        select(SensorReading.metric, SensorReading.value).where(
-            SensorReading.sensor == sensor, SensorReading.ts == latest_ts
-        )
-    ).all()
-    age_s = (get_datetime_utc() - latest_ts).total_seconds()
-    return LatestReadings(
-        sensor=sensor,
-        ts=latest_ts,
-        age_s=age_s,
-        stale=age_s > settings.STALE_AFTER_S,
-        metrics=dict(rows),
-    )
+    return latest_readings(session, sensor)
 
 
 @router.get("/history")

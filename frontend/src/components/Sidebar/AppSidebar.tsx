@@ -1,4 +1,4 @@
-import { Compass, Gauge, Leaf, Wind } from "lucide-react"
+import { CloudUpload, Compass, Gauge, Leaf, Wind } from "lucide-react"
 
 import { SidebarAppearance } from "@/components/Common/Appearance"
 import { Logo } from "@/components/Common/Logo"
@@ -19,6 +19,14 @@ const sensorItems: Item[] = [
   { icon: Leaf, title: "Air quality", path: "/air-quality" },
 ]
 
+const shareItems: Item[] = [
+  {
+    icon: CloudUpload,
+    title: "Weather Underground",
+    path: "/weather-underground",
+  },
+]
+
 export function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
@@ -27,6 +35,7 @@ export function AppSidebar() {
       </SidebarHeader>
       <SidebarContent>
         <Main label="Sensors" items={sensorItems} />
+        <Main label="Sharing" items={shareItems} />
       </SidebarContent>
       <SidebarFooter>
         <SidebarAppearance />

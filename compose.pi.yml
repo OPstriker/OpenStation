@@ -11,6 +11,10 @@ services:
 
   backend:
     <<: *prebuilt
+    environment:
+      # Real sensors on the Pi: "Upload now" must really send to Weather
+      # Underground, even if .env was copied from the Mac (simulate=true).
+      COLLECTOR_SIMULATE: "false"
 
   collector:
     <<: *prebuilt

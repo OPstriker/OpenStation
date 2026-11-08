@@ -9,6 +9,7 @@ Raspberry Pi 5 host (Docker Compose)
  ├─ collector  same image, `python -m app.collector`; ONLY service with /dev/gpiochipN + /dev/i2c-1
  │              gpiozero + lgpio count pulses and read the vane encoder, smbus2 reads the barometer + SCD41
  │              → every SAMPLE_INTERVAL_S (1 s) insert rows
+ │              + a thread that uploads to Weather Underground on the dashboard-configured schedule
  ├─ prestart   one-shot `bash scripts/prestart.sh` (alembic upgrade head);
  │              backend + collector wait for it (service_completed_successfully)
  ├─ db         postgres:18, volume app-db-data
@@ -21,8 +22,9 @@ Raspberry Pi 5 host (Docker Compose)
 - **API** (`backend/app/api/routes/readings.py`):
   - `GET /api/v1/readings/latest?sensor=` returns the newest value per metric. Its `stale` flag is set when the newest row is older than `STALE_AFTER_S`.
   - `GET /api/v1/readings/history?sensor=&metric=&minutes=` returns raw points for up to 15 minutes. Longer windows are bucketed with `date_bin`.
+  - `GET/PUT /api/v1/wunderground` reads or updates the Weather Underground upload settings. GET also returns the status and what would be sent now, and never returns the station key. `POST /api/v1/wunderground/upload` uploads once, immediately.
   - `GET /api/v1/utils/health-check/` is unchanged from the template.
-- **Dashboard** (`frontend/`): React, TanStack Router and Query, polling every 1 s. It has one page per sensor: Wind (`/`), Wind direction (`/wind-direction`, a compass with the current and 2-min average bearing, plus a direction history), Barometer (`/barometer`, pressure in hPa, temperature in °F) and Air quality (`/air-quality`, CO2 in ppm with a Good/Elevated/High level, temperature and dew point in °F, humidity in %). The API calls go through a **hand-written fetch layer in `frontend/src/lib/api.ts`**; there is no generated client in use. When a response shape changes, update `api.ts` by hand.
+- **Dashboard** (`frontend/`): React, TanStack Router and Query, polling every 1 s. It has one page per sensor: Wind (`/`), Wind direction (`/wind-direction`, a compass with the current and 2-min average bearing, plus a direction history), Barometer (`/barometer`, pressure in hPa, temperature in °F) and Air quality (`/air-quality`, CO2 in ppm with a Good/Elevated/High level, temperature and dew point in °F, humidity in %). Under "Sharing", Weather Underground (`/weather-underground`) holds the upload settings, status and field preview. The API calls go through a **hand-written fetch layer in `frontend/src/lib/api.ts`**; there is no generated client in use. When a response shape changes, update `api.ts` by hand.
 
 ## Hardware
 
@@ -94,6 +96,24 @@ It goes on the same I2C bus as the barometer (a Grove I2C hub, or chain the wire
   - `AIR_QUALITY_TEMPERATURE_OFFSET_C` corrects the sensor's self-heating (the chip default is 4 °C).
   - Neither setting is written to EEPROM.
   - Readings settle over the first couple of hours.
+
+### Weather Underground upload
+
+- **Settings live in the database, not in `.env`.** They are one row in `wunderground_config` (id=1), edited on the dashboard's Weather Underground page: enabled, station ID, station key, interval (default 300 s) and station elevation.
+- **Who uploads:** `WundergroundUploader` (`backend/app/collector/uploader.py`), a thread in the collector. It re-reads the row every 15 s, so changes apply without a restart, and it never blocks the 1 Hz sampling loop. The backend's 4 workers never upload on a schedule.
+- **Logic:** `backend/app/wunderground.py` builds the fields, uploads and records the status. It is shared with the API's "Upload now". The upload is one GET to `weatherstation.wunderground.com/.../updateweatherstation.php` with `ID`, `PASSWORD` (the key), `dateutc=now`, `action=updateraw`. The reply `success` means it worked; anything else is stored as `error: …`.
+- **Field mapping:**
+  - `tempf`, `humidity` and `dewptf` come from the SCD41 (`air_quality`), never from the barometer's chip temperature;
+  - `baromin` is sea-level pressure, computed from `pressure_hpa` and the configured elevation, or taken from `sea_level_pressure_hpa`;
+  - `windspeedmph` is the 2-minute mean, `windgustmph` is the anemometer gust, and `winddir` is `direction_avg_deg`;
+  - no rain fields are sent.
+- **When a field is left out:** while its sensor's newest row is older than 60 s, or for `winddir`, while `calibrated` is 0. The station never sends 0 as a placeholder.
+- **Secrets:**
+  - The key is write-only through the API; a blank key in a PUT keeps the stored one.
+  - The key is replaced with `***` in stored error messages.
+  - The `httpx` logger is raised to WARNING because its request log line would contain the key.
+  - The dashboard has no login, so anyone who can open it can change the settings, and the key is visible in Postgres/Adminer.
+- **`COLLECTOR_SIMULATE=true` makes every upload a dry run**, from both the collector and "Upload now", so simulated data never reaches WU.
 
 ### Calibration (anemometer)
 

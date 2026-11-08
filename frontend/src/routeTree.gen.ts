@@ -13,6 +13,7 @@ import { Route as LayoutRouteImport } from './routes/_layout'
 import { Route as LayoutIndexRouteImport } from './routes/_layout/index'
 import { Route as LayoutAirQualityRouteImport } from './routes/_layout/air-quality'
 import { Route as LayoutBarometerRouteImport } from './routes/_layout/barometer'
+import { Route as LayoutWeatherUndergroundRouteImport } from './routes/_layout/weather-underground'
 import { Route as LayoutWindDirectionRouteImport } from './routes/_layout/wind-direction'
 
 const LayoutRoute = LayoutRouteImport.update({
@@ -34,6 +35,12 @@ const LayoutBarometerRoute = LayoutBarometerRouteImport.update({
   path: '/barometer',
   getParentRoute: () => LayoutRoute,
 } as any)
+const LayoutWeatherUndergroundRoute =
+  LayoutWeatherUndergroundRouteImport.update({
+    id: '/weather-underground',
+    path: '/weather-underground',
+    getParentRoute: () => LayoutRoute,
+  } as any)
 const LayoutWindDirectionRoute = LayoutWindDirectionRouteImport.update({
   id: '/wind-direction',
   path: '/wind-direction',
@@ -44,11 +51,13 @@ export interface FileRoutesByFullPath {
   '/': typeof LayoutIndexRoute
   '/air-quality': typeof LayoutAirQualityRoute
   '/barometer': typeof LayoutBarometerRoute
+  '/weather-underground': typeof LayoutWeatherUndergroundRoute
   '/wind-direction': typeof LayoutWindDirectionRoute
 }
 export interface FileRoutesByTo {
   '/air-quality': typeof LayoutAirQualityRoute
   '/barometer': typeof LayoutBarometerRoute
+  '/weather-underground': typeof LayoutWeatherUndergroundRoute
   '/wind-direction': typeof LayoutWindDirectionRoute
   '/': typeof LayoutIndexRoute
 }
@@ -57,19 +66,31 @@ export interface FileRoutesById {
   '/_layout': typeof LayoutRouteWithChildren
   '/_layout/air-quality': typeof LayoutAirQualityRoute
   '/_layout/barometer': typeof LayoutBarometerRoute
+  '/_layout/weather-underground': typeof LayoutWeatherUndergroundRoute
   '/_layout/wind-direction': typeof LayoutWindDirectionRoute
   '/_layout/': typeof LayoutIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/air-quality' | '/barometer' | '/wind-direction'
+  fullPaths:
+    | '/'
+    | '/air-quality'
+    | '/barometer'
+    | '/weather-underground'
+    | '/wind-direction'
   fileRoutesByTo: FileRoutesByTo
-  to: '/air-quality' | '/barometer' | '/wind-direction' | '/'
+  to:
+    | '/air-quality'
+    | '/barometer'
+    | '/weather-underground'
+    | '/wind-direction'
+    | '/'
   id:
     | '__root__'
     | '/_layout'
     | '/_layout/air-quality'
     | '/_layout/barometer'
+    | '/_layout/weather-underground'
     | '/_layout/wind-direction'
     | '/_layout/'
   fileRoutesById: FileRoutesById
@@ -108,6 +129,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LayoutBarometerRouteImport
       parentRoute: typeof LayoutRoute
     }
+    '/_layout/weather-underground': {
+      id: '/_layout/weather-underground'
+      path: '/weather-underground'
+      fullPath: '/weather-underground'
+      preLoaderRoute: typeof LayoutWeatherUndergroundRouteImport
+      parentRoute: typeof LayoutRoute
+    }
     '/_layout/wind-direction': {
       id: '/_layout/wind-direction'
       path: '/wind-direction'
@@ -121,6 +149,7 @@ declare module '@tanstack/react-router' {
 interface LayoutRouteChildren {
   LayoutAirQualityRoute: typeof LayoutAirQualityRoute
   LayoutBarometerRoute: typeof LayoutBarometerRoute
+  LayoutWeatherUndergroundRoute: typeof LayoutWeatherUndergroundRoute
   LayoutWindDirectionRoute: typeof LayoutWindDirectionRoute
   LayoutIndexRoute: typeof LayoutIndexRoute
 }
@@ -128,6 +157,7 @@ interface LayoutRouteChildren {
 const LayoutRouteChildren: LayoutRouteChildren = {
   LayoutAirQualityRoute: LayoutAirQualityRoute,
   LayoutBarometerRoute: LayoutBarometerRoute,
+  LayoutWeatherUndergroundRoute: LayoutWeatherUndergroundRoute,
   LayoutWindDirectionRoute: LayoutWindDirectionRoute,
   LayoutIndexRoute: LayoutIndexRoute,
 }

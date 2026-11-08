@@ -14,6 +14,20 @@ export class ApiError extends Error {
   }
 }
 
+async function apiError(res: Response): Promise<ApiError> {
+  let detail = res.statusText
+  try {
+    const body = (await res.json()) as { detail?: unknown }
+    if (typeof body.detail === "string") detail = body.detail
+    // FastAPI validation errors: [{ msg, loc }, ...]
+    else if (Array.isArray(body.detail) && body.detail[0]?.msg)
+      detail = String(body.detail[0].msg)
+  } catch {
+    // Non-JSON error body (e.g. a proxy page); keep statusText.
+  }
+  return new ApiError(res.status, `${res.status} ${detail}`.trim())
+}
+
 type QueryParams = Record<string, string | number | undefined>
 
 async function getJson<T>(
@@ -32,16 +46,21 @@ async function getJson<T>(
     headers: { Accept: "application/json" },
     signal,
   })
-  if (!res.ok) {
-    let detail = res.statusText
-    try {
-      const body = (await res.json()) as { detail?: unknown }
-      if (typeof body.detail === "string") detail = body.detail
-    } catch {
-      // Non-JSON error body (e.g. a proxy page); keep statusText.
-    }
-    throw new ApiError(res.status, `${res.status} ${detail}`.trim())
-  }
+  if (!res.ok) throw await apiError(res)
+  return (await res.json()) as T
+}
+
+async function sendJson<T>(
+  method: "PUT" | "POST",
+  path: string,
+  body?: unknown,
+): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method,
+    headers: { Accept: "application/json", "Content-Type": "application/json" },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  })
+  if (!res.ok) throw await apiError(res)
   return (await res.json()) as T
 }
 
@@ -122,4 +141,55 @@ export const readingsApi = {
     params: { sensor: string; metric: string; minutes: number },
     signal?: AbortSignal,
   ) => getJson<ReadingHistory>("/api/v1/readings/history", params, signal),
+}
+
+// ---- Weather Underground upload --------------------------------------------
+
+/** One upload field: the value that would be sent now, or why it is left out. */
+export interface WundergroundField {
+  /** WU parameter name, e.g. "tempf". */
+  field: string
+  label: string
+  value: number | null
+  unit: string
+  source: string
+  /** Reason the field is left out of the upload; null when it is sent. */
+  skipped: string | null
+}
+
+/** Upload settings and status. The station key is never returned. */
+export interface WundergroundConfig {
+  enabled: boolean
+  station_id: string
+  has_key: boolean
+  interval_s: number
+  elevation_m: number | null
+  last_attempt_at: string | null
+  last_success_at: string | null
+  /** "success", "error: ...", "skipped: ..." or "dry run: ..." */
+  last_result: string | null
+  last_payload: Record<string, number> | null
+  next_upload_at: string | null
+  /** True in simulate mode: uploads are built but never sent. */
+  dry_run: boolean
+  fields: WundergroundField[]
+}
+
+/** Partial update. A blank or missing station_key keeps the stored key. */
+export interface WundergroundUpdate {
+  enabled?: boolean
+  station_id?: string
+  station_key?: string
+  /** 60..3600 */
+  interval_s?: number
+  elevation_m?: number | null
+}
+
+export const wundergroundApi = {
+  get: (signal?: AbortSignal) =>
+    getJson<WundergroundConfig>("/api/v1/wunderground", {}, signal),
+  update: (body: WundergroundUpdate) =>
+    sendJson<WundergroundConfig>("PUT", "/api/v1/wunderground", body),
+  uploadNow: () =>
+    sendJson<WundergroundConfig>("POST", "/api/v1/wunderground/upload"),
 }
